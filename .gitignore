@@ -1,0 +1,4 @@
+./testapp/
+./.vscode/
+./p3wm.x11
+./src/*.o

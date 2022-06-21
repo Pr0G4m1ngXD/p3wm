@@ -109,11 +109,11 @@ int main(int argc, char *argv[]) {
 
         // Check the event type
         switch (xEvent.type) {
-            case KeyPress:
-                return 0;
+            case KeyPress: //note to self: return in a switch statement during a for loop is may and will exit the app
                 break;
             case KeyRelease:
                 if (xEvent.xkey.subwindow != None) {
+                    log("Key: " + std::to_string(xEvent.xkey.keycode), 7);
                     switch (XKeycodeToKeysym(pointerToDisplay, xEvent.xkey.keycode, 0)) {
                         case XK_F1:  std::cout << help << std::endl;
                             break;
@@ -156,6 +156,7 @@ int main(int argc, char *argv[]) {
                 reconfigureRequest(xEvent.xconfigurerequest);
                 break;  
             case MapRequest:
+                mapRequest(xEvent.xmaprequest.window);
                 break;
             case UnmapNotify:
                 break;
@@ -189,16 +190,7 @@ void closeWindow(Window window) {
 void toggleFullscreen(Window window) {
     log("Toggling fullscreen for window: " + std::to_string(window), 7);
     XEvent xEvent;
-    xEvent.type = ClientMessage;
-    xEvent.xclient.window = window;
-    xEvent.xclient.message_type = XInternAtom(pointerToDisplay, "_NET_WM_STATE", False);
-    xEvent.xclient.format = 32;
-    xEvent.xclient.data.l[0] = XInternAtom(pointerToDisplay, "_NET_WM_STATE_FULLSCREEN", False);
-    xEvent.xclient.data.l[1] = XInternAtom(pointerToDisplay, "_NET_WM_STATE_ADD", False);
-    xEvent.xclient.data.l[2] = XInternAtom(pointerToDisplay, "_NET_WM_STATE_FULLSCREEN", False);
-    xEvent.xclient.data.l[3] = 0;
-    xEvent.xclient.data.l[4] = 0;
-    XSendEvent(pointerToDisplay, xEvent.xclient.window, False, NoEventMask, &xEvent);
+    // Doesnt Work Yet, I probably need to manually move and resize and map the window again
 }
 
 void createNotify(XConfigureRequestEvent& event) {

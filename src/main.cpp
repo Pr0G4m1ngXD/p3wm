@@ -41,7 +41,7 @@
 void announcedOpen(std::string name);
 void closeWindow(Window window);
 void toggleFullscreen(Window window);
-void createNotify(XConfigureRequestEvent& event);
+void createNotify(XCreateWindowEvent &event);
 void reconfigureRequest(XConfigureRequestEvent& event);
 void mapRequest(Window window);
 
@@ -101,6 +101,9 @@ int main(int argc, char *argv[]) {
     XGrabButton(pointerToDisplay, LEFTMOUSEBUTTON, Mod1Mask, rootWindow, True, ButtonPressMask, GrabModeAsync, GrabModeAsync, None, None); // Left mouse button
     XGrabButton(pointerToDisplay, RIGHTMOUSEBUTTON, Mod1Mask, rootWindow, True, ButtonPressMask, GrabModeAsync, GrabModeAsync, None, None); // Right mouse button
 
+    // Select Inputs to get all events
+    XSelectInput(pointerToDisplay, rootWindow, SubstructureRedirectMask | SubstructureNotifyMask);
+    XSync(pointerToDisplay, False);
 
     // Loop through the events
     for (;;) {
@@ -151,6 +154,8 @@ int main(int argc, char *argv[]) {
                 XUngrabPointer(pointerToDisplay, CurrentTime);
                 break;
             case CreateNotify:
+                log("CreateNotify", 7);
+                createNotify(xEvent.xcreatewindow);
                 break;
             case ConfigureRequest:
                 reconfigureRequest(xEvent.xconfigurerequest);
@@ -193,7 +198,8 @@ void toggleFullscreen(Window window) {
     // Doesnt Work Yet, I probably need to manually move and resize and map the window again
 }
 
-void createNotify(XConfigureRequestEvent& event) {
+void createNotify(XCreateWindowEvent &event) {
+    log("Creating window: " + std::to_string(event.window), 7);
 }
 
 void reconfigureRequest(XConfigureRequestEvent& event) {
@@ -214,6 +220,7 @@ void reconfigureRequest(XConfigureRequestEvent& event) {
 }
 
 void mapRequest(Window window) {
+    log("Map request for window: " + std::to_string(window), 7);
     // This is deffinitly going to be fun, kappa
     XWindowAttributes windowAttributes;
     XGetWindowAttributes(pointerToDisplay, window, &windowAttributes); // Get the window attributes

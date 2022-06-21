@@ -27,6 +27,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <cstring>
+#include <unordered_map>
 
 #define XK_MISCELLANY 1
 #define XK_LATIN1 2
@@ -41,6 +42,7 @@ void announcedOpen(std::string name);
 void closeWindow(Window window);
 void toggleFullscreen(Window window);
 void createNotify(XConfigureRequestEvent& event);
+void reconfigureRequest(XConfigureRequestEvent& event);
 void mapRequest(Window window);
 
 int returnHigher(int a, int b);
@@ -50,6 +52,8 @@ Window rootWindow;
 XWindowAttributes windowAttributes;
 XButtonEvent xEventButton;
 XEvent xEvent;
+std::unordered_map<Window, Window> windowMap;
+char config[57];
 
 int main(int argc, char *argv[]) {
 
@@ -58,10 +62,6 @@ int main(int argc, char *argv[]) {
     std::cout << disclaimer << std::endl; // Print the disclaimer
 
     log("Starting p3wm", 0); // Print a test message
-
-    // test the readvar overloading
-    readVar("/home/link/.p3wm/config.conf", "type", "undefined");
-    readVar("/home/link/.p3wm/config.conf", "version", 0);
 
     if (!(pointerToDisplay = XOpenDisplay(0x0))) {
         log("Could not open display (is X running?)", 3);
@@ -73,13 +73,12 @@ int main(int argc, char *argv[]) {
     // Make a new const char* for the path to the config files and set it to the home directory + .p3wm/config.conf
     const char* confighome = "/.p3wm/config.conf";
     // Make a new char* that is the home (const char*) + the config (const char*)
-    char config[57]; // 6 bytes for home + 32 bytes for username + 18 bytes for .p3wm/config.conf + 1 bytes for null terminator = 57 bytes total so we wont be wasting memory
     strcpy(config, home);
     strcat(config, confighome);
 
 
     // Test if config can be read .p3wm/config.conf in home directory
-    if (readVar(config, "type", "") != 1) {
+    if (readVar(config, "type", "") == "") {
         log("Could not read config file, creating new one", 1);
         system("cp /usr/share/p3wm/config.conf ~/.p3wm/config.conf");
     }
@@ -154,6 +153,7 @@ int main(int argc, char *argv[]) {
             case CreateNotify:
                 break;
             case ConfigureRequest:
+                reconfigureRequest(xEvent.xconfigurerequest);
                 break;  
             case MapRequest:
                 break;
@@ -204,7 +204,55 @@ void toggleFullscreen(Window window) {
 void createNotify(XConfigureRequestEvent& event) {
 }
 
+void reconfigureRequest(XConfigureRequestEvent& event) {
+    XWindowChanges newValues;
+
+    // For now we dont need to modify the window so we can just copy the values
+    newValues.x = event.x;
+    newValues.y = event.y;
+    newValues.width = event.width;
+    newValues.height = event.height;
+    newValues.border_width = event.border_width;
+    newValues.sibling = event.above;
+    newValues.stack_mode = event.detail;
+
+    XConfigureWindow(pointerToDisplay, event.window, event.value_mask, &newValues); // Grant the request
+    //LOG(INFO) << "Resize " << event.window << " to " << Size<int>(event.width, event.height);
+    log("Resize " + std::to_string(event.window) + " to " + std::to_string(event.width) + "x" + std::to_string(event.height), 7);
+}
+
 void mapRequest(Window window) {
+    // This is deffinitly going to be fun, kappa
+    XWindowAttributes windowAttributes;
+    XGetWindowAttributes(pointerToDisplay, window, &windowAttributes); // Get the window attributes
+
+    // TODO: Frame any existing windows
+
+    // Create the frame
+    const Window frame = XCreateSimpleWindow(pointerToDisplay, rootWindow, // Parent window
+        windowAttributes.x, windowAttributes.y, // Position
+        windowAttributes.width, windowAttributes.height, // Size
+        readVar(config, "borderWidth", 1), // Border width
+        readVar(config, "borderColor", 0x000000), // Border color
+        readVar(config, "backdropColor", 0x000000)); // Backdrop color
+    
+    // Select events from the frame
+    XSelectInput(pointerToDisplay, frame, SubstructureRedirectMask | SubstructureNotifyMask);
+
+    // Add client to save set so if we crash (which will probably happen with the code i write) itll be kept alive
+    XAddToSaveSet(pointerToDisplay, window);
+
+    // Putting the window in the frame
+    XReparentWindow(pointerToDisplay, window, frame, 0, 0);
+
+    // FINALLY WE GET TO MAP IT
+    XMapWindow(pointerToDisplay, frame);
+
+    // Save frame handle
+    windowMap[window] = frame; // i dont get what this does but the tutorial says it does
+
+    // WE GET TO MAP IT AGAIN (this time with the window)
+    XMapWindow(pointerToDisplay, window);
 }
 
 int returnHigher(int a, int b) {

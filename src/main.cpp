@@ -78,7 +78,7 @@ int main(int argc, char *argv[]) {
 
 
     // Test if config can be read .p3wm/config.conf in home directory
-    if (readVar(config, "type", "") == "") {
+    if (readVarStr(config, "type", "") == "") {
         log("Could not read config file, creating new one", 1);
         system("cp /usr/share/p3wm/config.conf ~/.p3wm/config.conf");
     }
@@ -231,9 +231,9 @@ void mapRequest(Window window) {
     const Window frame = XCreateSimpleWindow(pointerToDisplay, rootWindow, // Parent window
         windowAttributes.x, windowAttributes.y, // Position
         windowAttributes.width, windowAttributes.height, // Size
-        readVar(config, "borderWidth", 1), // Border width
-        readVar(config, "borderColor", 0x000000), // Border color
-        readVar(config, "backdropColor", 0x000000)); // Backdrop color
+        readVarInt(config, "borderWidth", 1), // Border width
+        readVarUnLong(config, "borderColor", 0xff0000), // Border color
+        readVarUnLong(config, "backdropColor", 0x0000ff)); // Backdrop color
     
     // Select events from the frame
     XSelectInput(pointerToDisplay, frame, SubstructureRedirectMask | SubstructureNotifyMask);

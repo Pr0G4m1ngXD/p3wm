@@ -1,5 +1,9 @@
 #include "readconf.h"
 #include "logging.h"
+// stringstreams
+#include <iostream> 
+#include <string> 
+#include <sstream> 
 
 int readVarInt(const char* filelocation, const char* valueName, int returnInt) {
     // 1. Open the file
@@ -72,8 +76,14 @@ unsigned long readVarUnLong(const char* filelocation, const char* valueName, uns
     }
     for (std::string line; std::getline(file, line);) { // for each line in the file
         if (line.find(valueName) != std::string::npos) { // if the line contains the valueName
-        //use stoul to convert the value to an unsigned long. make sure that if we get a hex value, we convert it to a decimal value that unsigned long can handle
-            unsigned long value = stoul(line.substr(line.find("=") + 1), nullptr, 0);
+            //use stoul to convert the value to an unsigned long.
+            // if the output of line.substr(line.find("=") + 1) starts with 0x, convert the hex value to an int first (stoul will turn the int to a ul)
+            unsigned int x;   
+            std::stringstream ss;
+            ss << std::hex << line.substr(line.find("=") + 1);
+            ss >> x;
+            // convert the int to a unsigned long
+            unsigned long value = x;
             file.close();
             log("Found value: " + std::to_string(value), 7);
             return value; // return the value

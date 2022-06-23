@@ -44,6 +44,8 @@ void toggleFullscreen(Window window);
 void createNotify(XCreateWindowEvent &event);
 void reconfigureRequest(XConfigureRequestEvent& event);
 void mapRequest(Window window);
+void mapWindow(Window window, bool beforeInit);
+void unmapWindow(XUnmapEvent& event);
 
 int returnHigher(int a, int b);
 
@@ -105,6 +107,19 @@ int main(int argc, char *argv[]) {
     XSelectInput(pointerToDisplay, rootWindow, SubstructureRedirectMask | SubstructureNotifyMask);
     XSync(pointerToDisplay, False);
 
+    // Frame exsisting windows
+    XGrabServer(pointerToDisplay);
+    Window returnedRoot, returnedParent;
+    Window* topLevelWindows;
+    unsigned int numberOfWindows;
+    XQueryTree(pointerToDisplay, rootWindow, &returnedRoot, &returnedParent, &topLevelWindows, &numberOfWindows);
+    for (int i = 0; i < numberOfWindows; i++) {
+        mapWindow(topLevelWindows[i], true);
+    }
+    XFree(topLevelWindows);
+    XUngrabServer(pointerToDisplay);
+    
+
     // Loop through the events
     for (;;) {
 
@@ -154,7 +169,6 @@ int main(int argc, char *argv[]) {
                 XUngrabPointer(pointerToDisplay, CurrentTime);
                 break;
             case CreateNotify:
-                log("CreateNotify", 7);
                 createNotify(xEvent.xcreatewindow);
                 break;
             case ConfigureRequest:
@@ -164,6 +178,7 @@ int main(int argc, char *argv[]) {
                 mapRequest(xEvent.xmaprequest.window);
                 break;
             case UnmapNotify:
+                unmapWindow(xEvent.xunmap);
                 break;
             case DestroyNotify:
                 break;
@@ -214,6 +229,11 @@ void reconfigureRequest(XConfigureRequestEvent& event) {
     newValues.sibling = event.above;
     newValues.stack_mode = event.detail;
 
+    if (windowMap.count(event.window)) {
+        const Window frame = windowMap[event.window];
+        XConfigureWindow(pointerToDisplay, frame, event.value_mask, &newValues);
+    }
+
     XConfigureWindow(pointerToDisplay, event.window, event.value_mask, &newValues); // Grant the request
     //LOG(INFO) << "Resize " << event.window << " to " << Size<int>(event.width, event.height);
     log("Resize " + std::to_string(event.window) + " to " + std::to_string(event.width) + "x" + std::to_string(event.height), 7);
@@ -221,12 +241,20 @@ void reconfigureRequest(XConfigureRequestEvent& event) {
 
 void mapRequest(Window window) {
     log("Map request for window: " + std::to_string(window), 7);
+    mapWindow(window, false); // Map the window
+}
+
+void mapWindow(Window window, bool beforeInit) {
     // This is deffinitly going to be fun, kappa
     XWindowAttributes windowAttributes;
     XGetWindowAttributes(pointerToDisplay, window, &windowAttributes); // Get the window attributes
 
-    // TODO: Frame any existing windows
-
+    if (beforeInit) {
+        if (windowAttributes.override_redirect || windowAttributes.map_state != IsViewable) {
+            log("Window already mapped", 7);
+            return;
+        }
+    }
     // Create the frame
     const Window frame = XCreateSimpleWindow(pointerToDisplay, rootWindow, // Parent window
         windowAttributes.x, windowAttributes.y, // Position
@@ -252,6 +280,25 @@ void mapRequest(Window window) {
 
     // WE GET TO MAP IT AGAIN (this time with the window)
     XMapWindow(pointerToDisplay, window);
+}
+
+void unmapWindow(XUnmapEvent& event) {
+    log("Unmap request for window: " + std::to_string(event.window), 7);
+    if (!windowMap.count(event.window)) {
+        log("Ignored unmapNotify from non-client window", 7);
+        return;
+    }
+    if (event.event == rootWindow) {
+        log("Ignored unmapNotify from root window", 7);
+        return;
+    }
+    // Now reverse the steps we took in mapRequest()
+    const Window frame = windowMap[event.window];
+    XUnmapWindow(pointerToDisplay, frame);
+    XReparentWindow(pointerToDisplay, event.window, rootWindow, 0, 0);
+    XRemoveFromSaveSet(pointerToDisplay, event.window);
+    XDestroyWindow(pointerToDisplay, frame);
+    windowMap.erase(event.window);
 }
 
 int returnHigher(int a, int b) {

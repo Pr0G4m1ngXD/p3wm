@@ -158,6 +158,8 @@ int main(int argc, char *argv[]) {
                 break;
             case MotionNotify:
                 int xdiff, ydiff;
+                int innerPadding;
+                innerPadding = readVarInt(config, "innerPadding", 0);
                 while (XCheckTypedEvent(pointerToDisplay, MotionNotify, &xEvent)); // make pc go brrrr (idk why this works)
                 xdiff = xEvent.xbutton.x_root - xEventButton.x_root; // difference in x coordinates from start of drag
                 ydiff = xEvent.xbutton.y_root - xEventButton.y_root; // difference in y coordinates from start of drag
@@ -166,6 +168,12 @@ int main(int argc, char *argv[]) {
                     windowAttributes.y + (xEventButton.button == 1 ? ydiff : 0), //New Y position
                     returnHigher(1, windowAttributes.width + (xEventButton.button == 3 ? xdiff : 0)),   //New width
                     returnHigher(1, windowAttributes.height + (xEventButton.button == 3 ? ydiff : 0))); //New height
+                XMoveResizeWindow(pointerToDisplay, xEvent.xmotion.subwindow, // move the window
+                    // we dont want to move the inner window, so we move the frame but we need to rezise the inner window
+                    innerPadding,
+                    innerPadding,
+                    returnHigher(1, windowAttributes.width + (xEventButton.button == 3 ? xdiff : 0) - (innerPadding * 2)),   //New width
+                    returnHigher(1, windowAttributes.height + (xEventButton.button == 3 ? ydiff : 0) - (innerPadding * 2))); //New height
                 break;
             case ButtonRelease:
                 XUngrabPointer(pointerToDisplay, CurrentTime);
@@ -185,7 +193,6 @@ int main(int argc, char *argv[]) {
             case DestroyNotify:
                 break;
             default:
-                log("Event not recognized", 7);
                 break;
                 
         }
@@ -304,6 +311,7 @@ void unmapWindow(XUnmapEvent& event) {
 }
 int onXError(Display *display, XErrorEvent *error) { // This is really unsafe because of no error handling just logging but ig it works?
     log("X Error: " + std::to_string(error->error_code) + " " + std::to_string(error->request_code) + " " + std::to_string(error->minor_code), 2);
+    return 0; // xlib shenanigans
 }
 
 int returnHigher(int a, int b) {

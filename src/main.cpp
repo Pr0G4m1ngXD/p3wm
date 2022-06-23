@@ -47,6 +47,7 @@ void mapRequest(Window window);
 void mapWindow(Window window, bool beforeInit);
 void unmapWindow(XUnmapEvent& event);
 
+int onXError(Display *display, XErrorEvent *event);
 int returnHigher(int a, int b);
 
 Display* pointerToDisplay;
@@ -107,6 +108,7 @@ int main(int argc, char *argv[]) {
     XSelectInput(pointerToDisplay, rootWindow, SubstructureRedirectMask | SubstructureNotifyMask);
     XSync(pointerToDisplay, False);
 
+    XSetErrorHandler(onXError);
     // Frame exsisting windows
     XGrabServer(pointerToDisplay);
     Window returnedRoot, returnedParent;
@@ -183,7 +185,7 @@ int main(int argc, char *argv[]) {
             case DestroyNotify:
                 break;
             default:
-                log("Event not recognized", 1);
+                log("Event not recognized", 7);
                 break;
                 
         }
@@ -299,6 +301,9 @@ void unmapWindow(XUnmapEvent& event) {
     XRemoveFromSaveSet(pointerToDisplay, event.window);
     XDestroyWindow(pointerToDisplay, frame);
     windowMap.erase(event.window);
+}
+int onXError(Display *display, XErrorEvent *error) { // This is really unsafe because of no error handling just logging but ig it works?
+    log("X Error: " + std::to_string(error->error_code) + " " + std::to_string(error->request_code) + " " + std::to_string(error->minor_code), 2);
 }
 
 int returnHigher(int a, int b) {
